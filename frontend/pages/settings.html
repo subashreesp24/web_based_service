@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings | ServiceSync</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Settings</h1>
+                <p style="color: var(--text-muted)">Configure your platform experience</p>
+            </div>
+        </header>
+
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+            <div class="glass" style="padding: 1.5rem;">
+                <nav class="flex flex-direction: column; gap: 0.5rem;">
+                    <button class="nav-item active" style="width: 100%; border: none; background: transparent; cursor: pointer;">Profile</button>
+                    <button class="nav-item" style="width: 100%; border: none; background: transparent; cursor: pointer;">Notifications</button>
+                    <button class="nav-item" style="width: 100%; border: none; background: transparent; cursor: pointer;">Appearance</button>
+                    <button class="nav-item" style="width: 100%; border: none; background: transparent; cursor: pointer;">API Security</button>
+                </nav>
+            </div>
+
+            <div class="glass" style="padding: 2rem;">
+                <h3 class="mb-4">Appearance</h3>
+                <div class="flex items-center justify-between mb-4" style="padding: 1rem; border: 1px solid var(--border); border-radius: 0.5rem;">
+                    <div>
+                        <div style="font-weight: 600;">Dark Mode</div>
+                        <div style="font-size: 0.875rem; color: var(--text-muted);">Adjust the theme of the interface</div>
+                    </div>
+                    <button class="btn-primary" style="width: auto; padding: 0.5rem 1rem;" onclick="theme.toggle()">Toggle</button>
+                </div>
+
+                <h3 class="mb-4 mt-4">Profile Settings</h3>
+                <div class="form-group">
+                    <label>Full Name</label>
+                    <input type="text" id="profName" value="Admin User">
+                </div>
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="profEmail" value="admin@analytics.com">
+                </div>
+                <button class="btn-primary" style="width: auto; padding: 0.75rem 2rem;">Save Changes</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="../js/theme.js"></script>
+    <script src="../js/layout.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initSidebar('settings');
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            if (user.name) document.getElementById('profName').value = user.name;
+            if (user.email) document.getElementById('profEmail').value = user.email;
+        });
+    </script>
+</body>
+</html>

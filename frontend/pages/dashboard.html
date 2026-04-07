@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | ServiceSync</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Dashboard Overview</h1>
+                <p style="color: var(--text-muted)">Welcome back, <span id="userName">Admin</span></p>
+            </div>
+            <div class="flex items-center gap: 1rem;">
+                <button onclick="theme.toggle()" class="btn-primary" style="padding: 0.5rem 1rem; font-size: 0.875rem;">Toggle Theme</button>
+            </div>
+        </header>
+
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card glass">
+                <span class="label">Total Services</span>
+                <span class="value" id="totalServices">--</span>
+            </div>
+            <div class="stat-card glass">
+                <span class="label">Active Services</span>
+                <span class="value" id="activeServices" style="color: var(--accent)">--</span>
+            </div>
+            <div class="stat-card glass">
+                <span class="label">Failed Services</span>
+                <span class="value" id="failedServices" style="color: var(--danger)">--</span>
+            </div>
+            <div class="stat-card glass">
+                <span class="label">Avg Response Time</span>
+                <span class="value" id="avgResponseTime">--</span>
+            </div>
+        </div>
+
+        <div class="glass" style="padding: 1.5rem; margin-bottom: 2rem;">
+            <h3 class="mb-4">Service Performance Trends</h3>
+            <div class="chart-container">
+                <canvas id="performanceChart"></canvas>
+            </div>
+        </div>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/layout.js"></script>
+    <script>
+        let performanceChart = null;
+
+        async function updateDashboard() {
+            console.log('Refreshing dashboard data...');
+            
+            // Load Stats
+            const stats = await api.get('/dashboard/stats');
+            if (stats) {
+                document.getElementById('totalServices').textContent = stats.totalServices;
+                document.getElementById('activeServices').textContent = stats.activeServices;
+                document.getElementById('failedServices').textContent = stats.failedServices;
+                document.getElementById('avgResponseTime').textContent = stats.avgResponseTime;
+            }
+
+            // Load Chart Data
+            const trends = await api.get('/analytics/trends');
+            if (trends) {
+                const ctx = document.getElementById('performanceChart').getContext('2d');
+                
+                if (performanceChart) {
+                    // Update existing chart
+                    performanceChart.data.labels = trends.labels;
+                    performanceChart.data.datasets[0].data = trends.traffic;
+                    performanceChart.data.datasets[1].data = trends.errors.map(e => e * 50);
+                    performanceChart.update();
+                } else {
+                    // Initialize chart
+                    performanceChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: trends.labels,
+                            datasets: [{
+                                label: 'Traffic Requests',
+                                data: trends.traffic,
+                                borderColor: '#4f46e5',
+                                backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                                fill: true,
+                                tension: 0.4
+                            }, {
+                                label: 'Errors',
+                                data: trends.errors.map(e => e * 50),
+                                borderColor: '#ef4444',
+                                borderDash: [5, 5],
+                                tension: 0.4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: true, position: 'bottom' }
+                            },
+                            scales: {
+                                y: { grid: { color: 'rgba(255,255,255,0.05)' } },
+                                x: { grid: { display: false } }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            initSidebar('dashboard');
+            
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('userName').textContent = user.name || 'User';
+
+            // Initial load
+            await updateDashboard();
+
+            // Auto-refresh every 2 minutes (120,000ms)
+            setInterval(updateDashboard, 120000);
+        });
+    </script>
+</body>
+</html>

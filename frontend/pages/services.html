@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services | ServiceSync</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            width: 90%;
+            max-width: 800px;
+            padding: 2rem;
+            position: relative;
+        }
+        .close-modal {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+        .chart-container-large {
+            height: 400px;
+            margin-top: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Monitored Services</h1>
+                <p style="color: var(--text-muted)">Real-time status of all infrastructure components</p>
+            </div>
+            <button class="btn-primary" style="padding: 0.5rem 1rem;" onclick="openAddModal()">Add Service</button>
+        </header>
+
+        <div class="glass" style="padding: 1.5rem;">
+            <div class="table-container">
+                <table id="servicesTable">
+                    <thead>
+                        <tr>
+                            <th>Service Name</th>
+                            <th>Status</th>
+                            <th>Response Time</th>
+                            <th>Last Checked</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="servicesBody">
+                        <tr><td colspan="5" style="text-align: center; padding: 3rem;">Loading services...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <div id="graphModal" class="modal">
+        <div class="modal-content glass">
+            <span class="close-modal" onclick="closeModal('graphModal')">&times;</span>
+            <h2 id="modalTitle">Service Performance</h2>
+            <div class="chart-container-large">
+                <canvas id="servicePerformanceChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div id="addModal" class="modal">
+        <div class="modal-content glass" style="max-width: 500px;">
+            <span class="close-modal" onclick="closeModal('addModal')">&times;</span>
+            <h2>Add New Service</h2>
+            <form id="addServiceForm" style="margin-top: 1.5rem;">
+                <div class="form-group">
+                    <label>Service Name</label>
+                    <input type="text" id="serviceName" placeholder="e.g. Redis Cache" required>
+                </div>
+                <div class="form-group">
+                    <label>Initial Status</label>
+                    <select id="serviceStatus" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; background: transparent; color: var(--text); border: 1px solid var(--border);">
+                        <option value="Active">Active</option>
+                        <option value="Failed">Failed</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Response Time</label>
+                    <input type="text" id="serviceTime" placeholder="e.g. 50ms">
+                </div>
+                <button type="submit" class="btn-primary" style="margin-top: 1rem;">Create Service</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/layout.js"></script>
+    <script>
+        let performanceChart = null;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            initSidebar('services');
+            loadServices();
+
+            document.getElementById('addServiceForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('serviceName').value;
+                const status = document.getElementById('serviceStatus').value;
+                const responseTime = document.getElementById('serviceTime').value;
+
+                const result = await api.post('/services', { name, status, responseTime });
+                if (result.success) {
+                    closeModal('addModal');
+                    loadServices();
+                    document.getElementById('addServiceForm').reset();
+                } else {
+                    alert('Error adding service');
+                }
+            });
+        });
+
+        async function loadServices() {
+            const services = await api.get('/services');
+            const body = document.getElementById('servicesBody');
+            
+            if (services && services.length > 0) {
+                body.innerHTML = services.map(s => `
+                    <tr>
+                        <td style="font-weight: 600;">${s.name}</td>
+                        <td>
+                            <span class="status-badge ${s.status === 'Active' ? 'status-active' : 'status-failed'}">
+                                ${s.status}
+                            </span>
+                        </td>
+                        <td>${s.responseTime}</td>
+                        <td>${s.lastChecked}</td>
+                        <td style="display: flex; gap: 0.5rem;">
+                            <button onclick="viewGraph(${s.id}, '${s.name}')" class="btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--primary); border: none; color: white;">
+                                Graph
+                            </button>
+                            <button onclick="deleteService(${s.id})" class="btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: transparent; border: 1px solid var(--danger); color: var(--danger);">
+                                Delete
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            } else {
+                body.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 3rem;">No services found.</td></tr>';
+            }
+        }
+
+        async function deleteService(id) {
+            if (confirm('Are you sure you want to delete this service?')) {
+                const result = await api.delete(`/services/${id}`);
+                if (result.success) {
+                    loadServices();
+                } else {
+                    alert('Error deleting service');
+                }
+            }
+        }
+
+        function openAddModal() {
+            document.getElementById('addModal').style.display = 'flex';
+        }
+
+        async function viewGraph(id, name) {
+            const modal = document.getElementById('graphModal');
+            const trends = await api.get('/analytics/trends');
+            
+            let data = null;
+            if (trends && trends.services && trends.services[id]) {
+                data = trends.services[id];
+            } else {
+                // Generate random mock data for new services
+                data = {
+                    traffic: Array.from({length: 7}, () => Math.floor(Math.random() * 500) + 100),
+                    responseTime: Array.from({length: 7}, () => Math.floor(Math.random() * 200) + 50)
+                };
+            }
+
+            document.getElementById('modalTitle').textContent = `${name} Performance Trends`;
+            modal.style.display = 'flex';
+
+            const ctx = document.getElementById('servicePerformanceChart').getContext('2d');
+
+            if (performanceChart) performanceChart.destroy();
+
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trends ? trends.labels : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+                    datasets: [{
+                        label: 'Traffic Requests',
+                        data: data.traffic,
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Response Time (ms)',
+                        data: data.responseTime,
+                        borderColor: '#10b981',
+                        borderDash: [5, 5],
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { 
+                            title: { display: true, text: 'Traffic' },
+                            grid: { color: 'rgba(255,255,255,0.05)' } 
+                        },
+                        y1: {
+                            position: 'right',
+                            title: { display: true, text: 'Latency (ms)' },
+                            grid: { display: false }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            const graphModal = document.getElementById('graphModal');
+            const addModal = document.getElementById('addModal');
+            if (event.target == graphModal) closeModal('graphModal');
+            if (event.target == addModal) closeModal('addModal');
+        }
+    </script>
+</body>
+</html>

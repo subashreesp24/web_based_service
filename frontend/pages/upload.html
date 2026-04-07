@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Upload | ServiceSync</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <main class="main-content">
+        <header class="page-header">
+            <div>
+                <h1>Data Upload</h1>
+                <p style="color: var(--text-muted)">Import CSV or log files for analysis</p>
+            </div>
+        </header>
+
+        <div class="glass" style="padding: 2rem; margin-bottom: 2rem;">
+            <div class="upload-zone" id="uploadZone">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 1rem; color: var(--primary);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                <h3>Drag & Drop Files Here</h3>
+                <p style="color: var(--text-muted); margin-top: 0.5rem;">Supported formats: .csv, .log, .json</p>
+                <input type="file" id="fileInput" hidden>
+                <button class="btn-primary mt-4" style="width: auto; padding: 0.75rem 2rem;" onclick="document.getElementById('fileInput').click()">Browse Files</button>
+            </div>
+        </div>
+
+        <div class="glass" id="uploadPreview" style="padding: 1.5rem; display: none;">
+            <h3 class="mb-4">Upload History</h3>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>File Name</th>
+                            <th>Status</th>
+                            <th>Progress</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="uploadHistoryBody">
+                        <!-- Populated dynamicly -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script src="../js/api.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/layout.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => initSidebar('upload'));
+
+        const fileInput = document.getElementById('fileInput');
+        const uploadZone = document.getElementById('uploadZone');
+        const preview = document.getElementById('uploadPreview');
+        const historyBody = document.getElementById('uploadHistoryBody');
+
+        fileInput.addEventListener('change', async (e) => {
+            const files = e.target.files;
+            if (files.length > 0) {
+                handleUpload(files[0]);
+            }
+        });
+
+        async function handleUpload(file) {
+            preview.style.display = 'block';
+            const rowId = 'row-' + Date.now();
+            
+            historyBody.innerHTML += `
+                <tr id="${rowId}">
+                    <td>${file.name}</td>
+                    <td><span class="status-badge" style="background: rgba(245, 158, 11, 0.1); color: var(--warning);">Uploading</span></td>
+                    <td>0%</td>
+                    <td>--</td>
+                </tr>
+            `;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const result = await api.upload('/upload', formData);
+            const row = document.getElementById(rowId);
+            
+            if (result.success) {
+                row.innerHTML = `
+                    <td>${file.name}</td>
+                    <td><span class="status-badge status-active">Completed</span></td>
+                    <td>100%</td>
+                    <td style="color: var(--primary); cursor: pointer; text-decoration: underline;">View Logs</td>
+                `;
+            } else {
+                row.innerHTML = `
+                    <td>${file.name}</td>
+                    <td><span class="status-badge status-failed">Failed</span></td>
+                    <td>0%</td>
+                    <td>Retry</td>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
