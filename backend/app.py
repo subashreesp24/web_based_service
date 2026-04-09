@@ -1,7 +1,11 @@
-from flask import Flask, jsonify, request
-from flask_cors import CORS
 import os
 import json
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -36,9 +40,12 @@ def login():
         print(f"Login attempt: {data}")
         email = data.get('email')
         password = data.get('password')
+        admin_email = os.getenv('ADMIN_EMAIL', 'suba')
+        admin_password = os.getenv('ADMIN_PASSWORD', 'suba123')
+        jwt_secret = os.getenv('JWT_SECRET', 'mock-jwt-token')
         
-        if email == "subashree.ei23@bitsathy.ac.in" and password == "suba":
-            return jsonify({"success": True, "token": "mock-jwt-token", "user": {"name": "Admin User", "email": email}})
+        if email == admin_email and password == admin_password:
+            return jsonify({"success": True, "token": jwt_secret, "user": {"name": "Admin User", "email": email}})
         return jsonify({"success": False, "message": "Invalid credentials"}), 401
     except Exception as e:
         print(f"Login error: {str(e)}")
@@ -74,4 +81,5 @@ def upload_file():
     return jsonify({"success": True, "message": f"File {file.filename} uploaded and processed successfully"})
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    port = int(os.getenv('PORT', 5000))
+    app.run(debug=True, port=port)
