@@ -1,0 +1,11 @@
+# Node.js dependencies
+backend/node_modules/
+
+# Local environment files
+backend/.env
+
+# Local SQLite database
+backend/analytics.db
+
+# System files
+.DS_Store

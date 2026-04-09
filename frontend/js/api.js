@@ -1,4 +1,19 @@
-const API_URL = 'http://localhost:5000/api';
+const API_URL = (() => {
+    const remoteBackend = window.API_BASE_URL;
+    if (remoteBackend && typeof remoteBackend === 'string') {
+        const trimmed = remoteBackend.replace(/\/+$/, '');
+        return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+    }
+
+    const localBackend = 'http://localhost:5000/api';
+    const host = window.location.hostname;
+
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return localBackend;
+    }
+
+    return `${window.location.protocol}//${host}${window.location.port ? `:${window.location.port}` : ''}/api`;
+})();
 
 const api = {
     async post(endpoint, data) {

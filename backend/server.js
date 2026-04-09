@@ -1,10 +1,12 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
+const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
@@ -12,19 +14,31 @@ app.use(express.json());
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../frontend')));
 
-// Mock Data
-const SERVICES_DATA = [
-    {id: 5, name: 'WhatsApp API', status: 'Active', responseTime: '250ms', lastChecked: 'Just now'},
-    {id: 6, name: 'Swiggy Delivery', status: 'Active', responseTime: '180ms', lastChecked: '3 mins ago'},
-    {id: 7, name: 'Telegram Bot', status: 'Active', responseTime: '90ms', lastChecked: '1 min ago'},
-];
+// Database setup
+const dbPath = process.env.SQLITE_DB_PATH || process.env.DATABASE_URL || path.join(__dirname, 'analytics.db');
+const db = new sqlite3.Database(dbPath);
 
-const DASHBOARD_STATS = {
-    totalServices: 3,
-    activeServices: 3,
-    failedServices: 0,
-    avgResponseTime: "173ms"
-};
+// Initialize database
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS services (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        status TEXT DEFAULT 'Active',
+        responseTime TEXT DEFAULT '0ms',
+        lastChecked TEXT DEFAULT 'Just now'
+    )`);
+
+    // Insert mock data if table is empty
+    db.get("SELECT COUNT(*) as count FROM services", (err, row) => {
+        if (row.count === 0) {
+            const stmt = db.prepare("INSERT INTO services (name, status, responseTime, lastChecked) VALUES (?, ?, ?, ?)");
+            stmt.run('WhatsApp API', 'Active', '250ms', 'Just now');
+            stmt.run('Swiggy Delivery', 'Active', '180ms', '3 mins ago');
+            stmt.run('Telegram Bot', 'Active', '90ms', '1 min ago');
+            stmt.finalize();
+        }
+    });
+});
 
 const ANALYTICS_TRENDS = {
     labels: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
@@ -44,11 +58,15 @@ app.post('/api/auth/login', (req, res) => {
     const { email, password } = req.body;
     console.log(`Login attempt for: ${email}`);
     
-    // Updated credentials: suba / suba123
-    if (email === "suba" && password === "suba123") {
+    // Updated credentials from environment or defaults
+    const adminEmail = process.env.ADMIN_EMAIL || "suba";
+    const adminPassword = process.env.ADMIN_PASSWORD || "suba123";
+    const jwtSecret = process.env.JWT_SECRET || "mock-jwt-token";
+    
+    if (email === adminEmail && password === adminPassword) {
         return res.json({
             success: true, 
-            token: "mock-jwt-token", 
+            token: jwtSecret, 
             user: { name: "Suba", email: email }
         });
     }
@@ -59,50 +77,53 @@ app.post('/api/auth/login', (req, res) => {
 app.get('/api/dashboard/stats', (req, res) => {
     console.log('GET /api/dashboard/stats');
     
-    // Add randomness for demonstration
-    const variance = Math.floor(Math.random() * 5) - 2; 
-    const active = Math.max(0, SERVICES_DATA.filter(s => s.status === 'Active').length + variance);
-    const failed = SERVICES_DATA.filter(s => s.status === 'Failed').length;
-    const avgResponse = SERVICES_DATA.length > 0 
-        ? Math.round(SERVICES_DATA.reduce((acc, s) => acc + parseInt(s.responseTime || 0), 0) / SERVICES_DATA.length) + (Math.floor(Math.random() * 20) - 10)
-        : 0;
-
-    res.json({
-        totalServices: SERVICES_DATA.length,
-        activeServices: active,
-        failedServices: failed,
-        avgResponseTime: `${avgResponse}ms`
+    db.all("SELECT status, responseTime FROM services", (err, rows) => {
+        if (err) return res.status(500).json({error: err.message});
+        
+        const total = rows.length;
+        const active = rows.filter(s => s.status === 'Active').length;
+        const failed = total - active;
+        const avgResponse = total > 0 ? Math.round(rows.reduce((acc, s) => acc + parseInt(s.responseTime || 0), 0) / total) : 0;
+        
+        res.json({
+            totalServices: total,
+            activeServices: active,
+            failedServices: failed,
+            avgResponseTime: `${avgResponse}ms`
+        });
     });
 });
 
 app.get('/api/services', (req, res) => {
     console.log('GET /api/services');
-    res.json(SERVICES_DATA);
+    db.all("SELECT * FROM services", (err, rows) => {
+        if (err) return res.status(500).json({error: err.message});
+        res.json(rows);
+    });
 });
 
 app.post('/api/services', (req, res) => {
     console.log('POST /api/services');
     const { name, status, responseTime } = req.body;
-    const newService = {
-        id: Date.now(),
-        name,
-        status: status || 'Active',
-        responseTime: responseTime || '0ms',
-        lastChecked: 'Just now'
-    };
-    SERVICES_DATA.push(newService);
-    res.json({ success: true, service: newService });
+    db.run("INSERT INTO services (name, status, responseTime, lastChecked) VALUES (?, ?, ?, ?)", 
+           [name, status || 'Active', responseTime || '0ms', 'Just now'], 
+           function(err) {
+        if (err) return res.status(500).json({error: err.message});
+        res.json({ success: true, service: { id: this.lastID, name, status: status || 'Active', responseTime: responseTime || '0ms', lastChecked: 'Just now' } });
+    });
 });
 
 app.delete('/api/services/:id', (req, res) => {
     const id = parseInt(req.params.id);
     console.log(`DELETE /api/services/${id}`);
-    const index = SERVICES_DATA.findIndex(s => s.id === id);
-    if (index !== -1) {
-        SERVICES_DATA.splice(index, 1);
-        return res.json({ success: true });
-    }
-    res.status(404).json({ success: false, message: "Service not found" });
+    db.run("DELETE FROM services WHERE id = ?", id, function(err) {
+        if (err) return res.status(500).json({error: err.message});
+        if (this.changes > 0) {
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ success: false, message: "Service not found" });
+        }
+    });
 });
 
 app.get('/api/analytics/trends', (req, res) => {
@@ -127,5 +148,5 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`Analytical Platform Backend running at http://localhost:${port}`);
+    console.log(`Analytical Platform Backend running on port ${port}`);
 });
