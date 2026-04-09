@@ -9,3 +9,4 @@ backend/analytics.db
 
 # System files
 .DS_Store
+node_modules/ 
