@@ -3,58 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login | Analytical Platform</title>
+    <title>Login | ServiceSync Analytics</title>
+    <meta name="description" content="Secure login to ServiceSync — your intelligent web-based analytics platform.">
     <link rel="stylesheet" href="css/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="login-container">
-        <div class="login-card glass">
-            <h1>Welcome Back</h1>
-            <p>Enter your credentials to access the platform</p>
-            
-            <form id="loginForm">
+        <!-- Animated orbs -->
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+
+        <div class="login-card">
+            <!-- Logo -->
+            <div class="login-logo">⚡</div>
+
+            <h1>ServiceSync</h1>
+            <p class="subtitle">Sign in to your analytics dashboard</p>
+
+            <form id="loginForm" autocomplete="off">
                 <div class="form-group">
-                    <label for="email">Email Address</label>
-                    <input type="text" id="email" placeholder="suba" required>
+                    <label for="email">Username</label>
+                    <div class="input-wrap">
+                        <input type="text" id="email" placeholder="Enter username" required>
+                        <span class="input-icon">👤</span>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" placeholder="suba123" required>
+                    <div class="input-wrap">
+                        <input type="password" id="password" placeholder="Enter password" required>
+                        <span class="input-icon">🔒</span>
+                    </div>
                 </div>
-                <button type="submit" class="btn-primary">Login</button>
+
+                <button type="submit" class="btn-primary" id="loginBtn" style="margin-top: 0.5rem;">
+                    <span id="loginBtnText">Sign In</span>
+                </button>
             </form>
-            <div id="loginMessage" class="mt-4" style="color: var(--danger); font-size: 0.875rem;"></div>
+
+            <div id="loginMessage" class="login-msg" style="margin-top:1rem; font-size:0.875rem; text-align:center; min-height:1.2em;"></div>
+
+            <div style="margin-top: 1.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border); display:flex; justify-content:center;">
+                <button onclick="theme.toggle()" class="btn-secondary" id="themeToggleBtn">
+                    <span id="themeIcon">☀️</span> Toggle Theme
+                </button>
+            </div>
         </div>
     </div>
 
     <script src="js/api.js"></script>
     <script src="js/theme.js"></script>
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const msg = document.getElementById('loginMessage');
+        const loginForm = document.getElementById('loginForm');
+        const loginMsg  = document.getElementById('loginMessage');
+        const loginBtn  = document.getElementById('loginBtn');
+        const loginBtnText = document.getElementById('loginBtnText');
 
-            msg.textContent = 'Authenticating...';
-            msg.style.color = 'var(--text-muted)';
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email    = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            loginBtnText.textContent = 'Authenticating…';
+            loginBtn.disabled = true;
+            loginMsg.style.color = 'var(--text-muted)';
+            loginMsg.textContent  = '';
 
             const result = await api.post('/auth/login', { email, password });
 
             if (result.success) {
-                msg.textContent = 'Login Successful!';
-                msg.style.color = 'var(--accent)';
-                localStorage.setItem('user', JSON.stringify(result.user));
+                loginMsg.style.color = 'var(--neon-green)';
+                loginMsg.textContent = '✓ Login successful — redirecting…';
+                localStorage.setItem('user',  JSON.stringify(result.user));
                 localStorage.setItem('token', result.token);
-                setTimeout(() => {
-                    window.location.href = 'pages/dashboard.html';
-                }, 1000);
+                setTimeout(() => window.location.href = 'pages/dashboard.html', 900);
             } else {
-                msg.textContent = 'Login Failed: ' + (result.message || 'Invalid credentials');
-                msg.style.color = 'var(--danger)';
+                loginBtnText.textContent = 'Sign In';
+                loginBtn.disabled = false;
+                loginMsg.style.color = 'var(--danger)';
+                loginMsg.textContent = '✕ ' + (result.message || 'Invalid credentials');
             }
         });
     </script>
